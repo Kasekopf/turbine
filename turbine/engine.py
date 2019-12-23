@@ -443,8 +443,7 @@ class GCEEngine:
             pass
         try:
             self._compute.instanceTemplates().delete(
-                project=self._config.project_id,
-                instanceTemplate=self._instance_template,
+                project=self._config.project_id, instanceTemplate=self._id
             ).execute()
             print("Deleted instance template " + self._instance_template)
         except:
