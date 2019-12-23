@@ -411,13 +411,15 @@ class GCEEngine:
                     result.append(InstanceGroupWorker(group))
         return result
 
-    def stop_workers(self):
+    def cleanup_workers(self, force_stop=False):
         """
-        Stop all workers and delete their instance groups.
+        Delete all workers provisioned by this engine.
+
+        :param force_stop: If False, an exception will be raised if the group still has active workers.
         :return: None
         """
         for worker in self.workers():
-            worker.delete(force_stop=True)
+            worker.delete(force_stop=force_stop)
 
     def cleanup(self, force_stop=True):
         """
