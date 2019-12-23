@@ -19,11 +19,11 @@ For most users, the recommended method to install the controller is via pip:
 pip install turbine
 ```
 
-To attach turbine to a docker image, install turbine on the image via pip and set  the `ENTRYPOINT` of the docker image as below (see [this example Dockerfile](demo/Dockerfile)):
+To attach turbine to a docker image, install turbine on the image via pip and set  the `ENTRYPOINT` of the docker image as below (see [this example Dockerfile](example/Dockerfile)):
 ```
 RUN pip install turbine
 
-ENTRYPOINT ["python", "-c", "'import turbine; turbine.run()'"]
+ENTRYPOINT ["python", "-c", "import turbine; turbine.run()"]
 ```
 
 
