@@ -364,17 +364,21 @@ class GCEEngine:
         :return:
         """
 
-        def delete_instance_group(name):
+        def delete_instance_group_manager(name, wait=True):
             """
-            Delete the provided instance group in this project
-            :param name:
-            :return:
+            Delete the provided instance group manager in this project
+            :param name: The name of the instance group manager to delete.
+            :param wait: If true, wait for the instance group manager to be deleted.
+            :return: None
             """
-            self._compute.instanceGroupManagers().delete(
+            print("Deleting instance group manager " + name)
+            delete_if_exists(
+                self._compute.instanceGroupManagers(),
+                wait=wait,
                 project=self._config.project_id,
                 zone=self._config.zone,
                 instanceGroupManager=name,
-            ).execute()
+            )
 
         class InstanceGroupWorker:
             def __init__(self, base):
@@ -383,16 +387,17 @@ class GCEEngine:
             def __getitem__(self, name):
                 return self._base[name]
 
-            def delete(self, force_stop=False):
+            def delete(self, force_stop=False, wait=True):
                 """
                 Delete the instance group.
 
                 :param force_stop: If False, an exception will be raised if the group still has active workers.
+                :param wait: If true, wait for the instance group manager to be deleted.
                 :return: None
                 """
                 if self["targetSize"] > 0 and not force_stop:
                     raise Exception("Instance group {name} has {num} workers running")
-                delete_instance_group(self["name"])
+                delete_instance_group_manager(self["name"], wait=wait)
 
             @property
             def info(self):
@@ -416,25 +421,27 @@ class GCEEngine:
                     result.append(InstanceGroupWorker(group))
         return result
 
-    def cleanup_workers(self, force_stop=False):
+    def cleanup_workers(self, force_stop=False, wait=True):
         """
         Delete all workers provisioned by this engine.
 
         :param force_stop: If False, an exception will be raised if the group still has active workers.
+        :param wait: If true, wait for all workers to be deleted.
         :return: None
         """
         for worker in self.workers():
-            worker.delete(force_stop=force_stop)
+            worker.delete(force_stop=force_stop, wait=wait)
 
-    def cleanup(self, force_stop=True):
+    def cleanup(self, force_stop=True, wait=True):
         """
         Delete all resources provisioned by this engine.
 
         :param force_stop: If False, an exception will be raised if the group still has active workers.
+        :param wait: If true, wait for all workers to be deleted.
         :return: None
         """
         for worker in self.workers():
-            worker.delete(force_stop=force_stop)
+            worker.delete(force_stop=force_stop, wait=wait)
 
         try:
             self._subscriber.delete_subscription(self._subscription_path)
