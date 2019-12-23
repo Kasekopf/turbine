@@ -1,13 +1,13 @@
-from google.cloud import pubsub
 import google.api_core.exceptions
 import google.auth.credentials
+import google.cloud.pubsub
 import googleapiclient.discovery
 import googleapiclient.errors
 import time
-from typing import List, Tuple, NamedTuple
+import typing
 
 
-class GCEConfig(NamedTuple):
+class GCEConfig(typing.NamedTuple):
     """
     A simple data class to store configuration information for the Google Compute Engine.
 
@@ -50,12 +50,12 @@ class GCEEngine:
         self._image = image
         self._config = config
 
-        self._publisher = pubsub.PublisherClient(
+        self._publisher = google.cloud.pubsub.PublisherClient(
             **{"credentials": self._config.credentials}
         )
         self._topic_path = self._publisher.topic_path(self._config.project_id, self._id)
 
-        self._subscriber = pubsub.SubscriberClient(
+        self._subscriber = google.cloud.pubsub.SubscriberClient(
             **{"credentials": self._config.credentials}
         )
         self._subscription_path = self._subscriber.subscription_path(
@@ -102,7 +102,7 @@ class GCEEngine:
         self,
         machine_type: str,
         preemptible: bool,
-        accelerators: List[Tuple[str, int]],
+        accelerators: typing.List[typing.Tuple[str, int]],
         delete_when_done: bool,
     ):
         """
@@ -232,7 +232,7 @@ class GCEEngine:
         self,
         machine_type: str = "n1-standard-1",
         preemptible: bool = True,
-        accelerators: List[Tuple[str, int]] = None,
+        accelerators: typing.List[typing.Tuple[str, int]] = None,
         delete_when_done: bool = True,
     ):
         """
@@ -267,8 +267,8 @@ class GCEEngine:
     def add_task(
         self,
         script: str,
-        inputs: List[Tuple[str, str]] = None,
-        outputs: List[Tuple[str, str]] = None,
+        inputs: typing.List[typing.Tuple[str, str]] = None,
+        outputs: typing.List[typing.Tuple[str, str]] = None,
     ):
         """
         Assign an additional task to this engine. A task consists of a script, together with some specified inputs.
