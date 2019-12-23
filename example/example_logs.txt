@@ -1,0 +1,88 @@
+[example-engine-x6f6] Starting heartbeat thread
+[example-engine-x6f6] Looking for tasks in queue
+[example-engine-95qb] Starting heartbeat thread
+[example-engine-95qb] Looking for tasks in queue
+"[example-engine-x6f6] [904402605508222] ack_id: ""BCEhPjA-RVNEUAYWLF1GSFE3GQhoUQ5PXiM_NSAoRRQACBQFfH1xRFd1X1UaB1ENGXJ8ZyNpWxVXVBZUL1VbEQx6bVxXOFgNHXZ9Y3NqXxYBCkdRfHfxpNHhs72INksxIevw0LVfeqCRseNhZho9XxJLLD5-LyJFQV5AEkwkF0RJUytDCypYEU4""
+message {
+  data: ""#!/bin/bash\nsleep 10\necho \""Processing task 2\""\nls 1>&2\nwc abc/xyz/input.txt > abc/xyz/output.txt""
+  attributes {
+    key: ""SOURCE abc/xyz/input.txt""
+    value: ""gs://turbine-demo-gcmcdobroe/cloud_input_file.txt""
+  }
+  attributes {
+    key: ""UPLOAD abc/xyz""
+    value: ""gs://turbine-demo-gcmcdobroe/worker_2""
+  }
+  message_id: ""904402605508222""
+  publish_time {
+    seconds: 1577082420
+    nanos: 446000000
+  }
+}
+"
+"[example-engine-95qb] [904402605508221] ack_id: ""BCEhPjA-RVNEUAYWLF1GSFE3GQhoUQ5PXiM_NSAoRRQACBQFfH1xRFd1X1UaB1ENGXJ8ZyNpWxVXVBZUL1VbEQ16bVxXOFgNHXZ9Y3NqXxYBCkdRf3fxpNHhs72INksxIevw0LVfeonbs-NhZho9XxJLLD5-LyJFQV5AEkwkF0RJUytDCypYEU4""
+message {
+  data: ""#!/bin/bash\nsleep 10\necho \""Processing task 1\""\nls 1>&2\nwc abc/xyz/input.txt > abc/xyz/output.txt""
+  attributes {
+    key: ""SOURCE abc/xyz/input.txt""
+    value: ""gs://turbine-demo-gcmcdobroe/cloud_input_file.txt""
+  }
+  attributes {
+    key: ""UPLOAD abc/xyz""
+    value: ""gs://turbine-demo-gcmcdobroe/worker_1""
+  }
+  message_id: ""904402605508221""
+  publish_time {
+    seconds: 1577082420
+    nanos: 446000000
+  }
+}
+"
+[example-engine-95qb] [904402605508221] [STDOUT] b'Processing task 1\n'
+[example-engine-x6f6] [904402605508222] [STDOUT] b'Processing task 2\n'
+[example-engine-95qb] [904402605508221] [STDERR] b'abc\nmessage.sh\n'
+[example-engine-x6f6] [904402605508222] [STDERR] b'abc\nmessage.sh\n'
+"[example-engine-95qb] [904402605508223] ack_id: ""TgQhIT4wPkVTRFAGFixdRkhRNxkIaFEOT14jPzUgKEUUAAgUBXx9cURXdV9VGgdRDRlyfGcjaVsVV1QWVC9VWxEPem1cVzhYDR12fWNzal8WAQpHUX138aTR4bO9iDZLNiH38NC1X3rm5oBZZho9XxJLLD5-LyJFQV5AEkwkF0RJUytDCypYEQ""
+message {
+  data: ""#!/bin/bash\nsleep 10\necho \""Processing task 3\""\nls 1>&2\nwc abc/xyz/input.txt > abc/xyz/output.txt""
+  attributes {
+    key: ""SOURCE abc/xyz/input.txt""
+    value: ""gs://turbine-demo-gcmcdobroe/cloud_input_file.txt""
+  }
+  attributes {
+    key: ""UPLOAD abc/xyz""
+    value: ""gs://turbine-demo-gcmcdobroe/worker_3""
+  }
+  message_id: ""904402605508223""
+  publish_time {
+    seconds: 1577082420
+    nanos: 446000000
+  }
+}
+"
+"[example-engine-x6f6] [904402605508224] ack_id: ""TgQhIT4wPkVTRFAGFixdRkhRNxkIaFEOT14jPzUgKEUUAAgUBXx9cURXdV9VGgdRDRlyfGcjaVsVV1QWVC9VWxEOem1cVzhYDR12fWNzal8WAQpHUXp38aTR4bO9iDZLNiH38NC1X3r9nZ1AZho9XxJLLD5-LyJFQV5AEkwkF0RJUytDCypYEQ""
+message {
+  data: ""#!/bin/bash\nsleep 10\necho \""Processing task 4\""\nls 1>&2\nwc abc/xyz/input.txt > abc/xyz/output.txt""
+  attributes {
+    key: ""SOURCE abc/xyz/input.txt""
+    value: ""gs://turbine-demo-gcmcdobroe/cloud_input_file.txt""
+  }
+  attributes {
+    key: ""UPLOAD abc/xyz""
+    value: ""gs://turbine-demo-gcmcdobroe/worker_4""
+  }
+  message_id: ""904402605508224""
+  publish_time {
+    seconds: 1577082420
+    nanos: 446000000
+  }
+}
+"
+[example-engine-95qb] [904402605508223] [STDOUT] b'Processing task 3\n'
+[example-engine-95qb] [904402605508223] [STDERR] b'abc\nmessage.sh\n'
+[example-engine-x6f6] [904402605508224] [STDOUT] b'Processing task 4\n'
+[example-engine-x6f6] [904402605508224] [STDERR] b'abc\nmessage.sh\n'
+[example-engine-95qb] 0 tasks in queue. Worker will terminate.
+[example-engine-x6f6] 0 tasks in queue. Worker will terminate.
+[example-engine-x6f6] Attempting to remove VM from instance group example-engine
+[example-engine-95qb] Attempting to remove VM from instance group example-engine

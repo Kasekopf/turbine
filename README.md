@@ -8,6 +8,8 @@ Turbine allows you to run those tasks on many VMs in parallel on GCE. Turbine is
 * [Google Cloud Functions](https://cloud.google.com/functions/) except it supports large machine types and accelerators; and
 * [Batch on GKE](https://cloud.google.com/kubernetes-engine/docs/how-to/batch/running-job) except I understand it, it is significantly lighter-weight than Kubernetes, and it provides a path for TPU access.
 
+See [this jupyter notebook](example/example_usage.ipynb) for detailed usage.
+
 # Installation
 Turbine consists of two components:
 1. A controller on the local machine to setup cloud components, enter tasks, and provision VMs.
