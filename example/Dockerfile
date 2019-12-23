@@ -1,6 +1,4 @@
 FROM python:3.7
 
+# Ensure that turbine is installed
 RUN pip install turbine
-
-# Run the turbine worker
-ENTRYPOINT ["python", "-c", "import turbine; turbine.run()"]
