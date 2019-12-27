@@ -4,6 +4,7 @@ import google.cloud.pubsub
 import googleapiclient.discovery
 import googleapiclient.errors
 import random
+import re
 import string
 import time
 import typing
@@ -283,7 +284,6 @@ class GCEEngine:
 
         # Create the template
         return GCEOperation(
-            self._config,
             self._compute,
             self._compute.instanceTemplates()
             .insert(project=self._config.project_id, body=template)
@@ -328,7 +328,6 @@ class GCEEngine:
         ).wait()
 
         return GCEOperation(
-            self._config,
             self._compute,
             self._compute.instanceGroupManagers()
             .insert(
@@ -501,31 +500,36 @@ def delete_if_exists(rest_type, wait: bool = True, **param):
 
 
 class GCEOperation:
-    def __init__(self, config, compute, op):
+    def __init__(self, compute, op):
         """
         Create a new updatable wrapper around a GCE operation call
-        :param config: GCE configuration information
         :param compute: The GCE compute API to use
         :param op: The current state of a GCE operation
         """
-        self._config = config
-        self._compute = compute
         self._base = op
+
+        project_match = re.match("/projects/([^/]*)/", op["targetLink"])
+        if project_match:
+            project_id = project_match.group(1)
+        else:
+            raise RuntimeError("Unable to detect project from operation")
+
+        if "zone" in self._base:
+            zone = op["zone"][op["zone"].rfind("/") + 1 :]
+            self._refresh_call = compute.zoneOperations().get(
+                operation=self._base["name"], project=project_id, zone=zone
+            )
+        else:
+            self._refresh_call = compute.globalOperations().get(
+                operation=self._base["name"], project=project_id
+            )
 
     def refresh(self):
         """
         Consult the server to update progress on this operation.
         :return: self, updated
         """
-        self._base = (
-            self._compute.zoneOperations()
-            .get(
-                operation=self._base["name"],
-                project=self._config.project_id,
-                zone=self._config.zone,
-            )
-            .execute()
-        )
+        self._base = self._refresh_call.execute()
         return self
 
     @property
