@@ -257,9 +257,7 @@ class GCEEngine:
                         "aliasIpRanges": [],
                     }
                 ],
-                "labels": {  # This might need to be updated?
-                    "container-vm": parent_vm_image
-                },
+                "labels": {"container-vm": parent_vm_image},
                 "scheduling": {
                     "preemptible": preemptible,
                     "onHostMaintenance": "TERMINATE",
@@ -303,7 +301,7 @@ class GCEEngine:
     ):
         """
         Start an instance group to process tasks given to this engine. All VMs in the instance group will automatically
-        delete themselves when the engine has no tasks left, unless delete_from_done is set.
+        delete themselves when the engine has no tasks left, unless delete_when_done is set.
 
         :param target_size: The number of VMs (<=500) to target in the instance group.
         :param worker_id: An additional, optional identifier for this worker. Will be randomized if not set.
@@ -370,6 +368,13 @@ class GCEEngine:
                 instanceGroupManager=name,
             )
 
+        def delete_instance_template(name):
+            """
+            Delete the provided instance template in this project. Block until deleted.
+
+            :param name: The name of the instance group manager to delete.
+            :return: None
+            """
             print("Deleting instance template " + name)
             delete_if_exists(
                 self._compute.instanceTemplates(),
@@ -399,6 +404,7 @@ class GCEEngine:
                         )
                     )
                 delete_instance_group_manager(self["name"])
+                delete_instance_template(self["name"])
 
             @property
             def info(self):
