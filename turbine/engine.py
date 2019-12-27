@@ -154,7 +154,7 @@ class GCEEngine:
         :param preemptible: True if the VM should be preemptible, otherwise false.
         :param accelerators: A list of (name, count) for each accelerator to be included.
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
-        :return: The GCE operation currently creating the template.
+        :return: None
         """
 
         # Delete this template if it already exists
@@ -280,7 +280,7 @@ class GCEEngine:
             self._compute.instanceTemplates()
             .insert(project=self._config.project_id, body=template)
             .execute(),
-        )
+        ).wait()
 
     def start(
         self,
@@ -301,7 +301,7 @@ class GCEEngine:
         :param preemptible: True if the VM should be preemptible, otherwise false.
         :param accelerators: A list of (name, count) for each accelerator to be included.
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
-        :return: The GCE operation currently creating workers.
+        :return: None
         """
 
         if target_size > 500:
@@ -335,7 +335,7 @@ class GCEEngine:
                 },
             )
             .execute(),
-        )
+        ).wait()
 
     def workers(self):
         """
