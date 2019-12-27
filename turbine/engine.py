@@ -42,7 +42,8 @@ class GCEEngine:
         """
         Create a engine to run shell scripts on a docker image in the google cloud.
 
-        :param engine_id: A unique identifier for this engine, used as the resource id for the associated topic, subscription, and instance template..
+        :param engine_id: A unique identifier for this engine, used as the resource id for the associated topic,
+                          subscription, and instance template.
         :param image: The GCE identifier of a docker image to run.
         :param config: GCE configuration information
         """
@@ -228,7 +229,7 @@ class GCEEngine:
             ]
         return template
 
-    def prepare_workers(
+    def _prepare_template(
         self,
         machine_type: str = "n1-standard-1",
         preemptible: bool = True,
@@ -240,6 +241,7 @@ class GCEEngine:
 
         In particular, set up an instance template for such VMs. Delete the previous instance template if any exists.
 
+        :param template_suffix:
         :param machine_type: The machine type to use for the specification.
         :param preemptible: True if the VM should be preemptible, otherwise false.
         :param accelerators: A list of (name, count) for each accelerator to be included.
@@ -260,9 +262,13 @@ class GCEEngine:
             delete_when_done=delete_when_done,
         )
 
-        self._compute.instanceTemplates().insert(
-            project=self._config.project_id, body=template
-        ).execute()
+        return GCEOperation(
+            self._config,
+            self._compute,
+            self._compute.instanceTemplates()
+            .insert(project=self._config.project_id, body=template)
+            .execute(),
+        )
 
     def add_task(
         self,
@@ -297,9 +303,7 @@ class GCEEngine:
 
         self._publisher.publish(self._topic_path, bytes(script, "UTF-8"), **attributes)
 
-    def start_workers(
-        self, target_size: int, worker_id: str = "", gcloud: bool = False
-    ):
+    def start_workers(self, target_size: int, worker_id: str = ""):
         """
         Start an instance group to process tasks given to this engine. All VMs in the instance group will automatically
         delete themselves when the engine has no tasks left.
@@ -325,38 +329,22 @@ class GCEEngine:
                 "Maximum allowed target size of 500"
             )  # Otherwise I have to figure out REST pagination
 
-        if gcloud:
-            return " ".join(
-                [
-                    "gcloud compute instance-groups managed create {name}",
-                    "--base-instance-name {name}",
-                    "--size {size}",
-                    "--template {template}",
-                    "--zone {zone}",
-                    "--project {project}",
-                ]
-            ).format(
-                name=name,
-                size=target_size,
-                template=self._instance_template,
-                zone=self._config.zone,
+        return GCEOperation(
+            self._config,
+            self._compute,
+            self._compute.instanceGroupManagers()
+            .insert(
                 project=self._config.project_id,
+                zone=self._config.zone,
+                body={
+                    "name": name,
+                    "instanceTemplate": self._instance_template,
+                    "baseInstanceName": name,
+                    "targetSize": target_size,
+                },
             )
-        else:
-            return (
-                self._compute.instanceGroupManagers()
-                .insert(
-                    project=self._config.project_id,
-                    zone=self._config.zone,
-                    body={
-                        "name": name,
-                        "instanceTemplate": self._instance_template,
-                        "baseInstanceName": name,
-                        "targetSize": target_size,
-                    },
-                )
-                .execute()
-            )
+            .execute(),
+        )
 
     def workers(self):
         """
@@ -497,3 +485,29 @@ def delete_if_exists(rest_type, wait: bool = True, **param):
                 time.sleep(1)
         return True
     return False
+
+
+class GCEOperation:
+    def __init__(self, config, compute, op):
+        self._config = config
+        self._compute = compute
+        self._base = op
+
+    def refresh(self):
+        self._base = (
+            self._compute.zoneOperations()
+            .get(
+                operation=self._base["name"],
+                project=self._config.project_id,
+                zone=self._config.zone,
+            )
+            .execute()
+        )
+        return self
+
+    @property
+    def base(self):
+        return self._base
+
+    def wait(self):
+        pass
