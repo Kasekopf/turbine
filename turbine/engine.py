@@ -500,11 +500,11 @@ class GCEOperation:
         """
         self._base = op
 
-        project_match = re.match("/projects/([^/]*)/", op["targetLink"])
+        project_match = re.search("/projects/([^/]*)/", op["targetLink"])
         if project_match:
             project_id = project_match.group(1)
         else:
-            raise RuntimeError("Unable to detect project from operation")
+            raise RuntimeError("Unable to detect project from operation", op)
 
         if "zone" in self._base:
             zone = op["zone"][op["zone"].rfind("/") + 1 :]
