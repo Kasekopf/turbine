@@ -385,7 +385,7 @@ class GCEEngine:
             def __getitem__(self, name):
                 return self._base[name]
 
-            def cleanup(self, force_stop=False):
+            def stop(self, force_stop=True):
                 """
                 Delete the instance group and associated template. Block until deleted.
 
@@ -393,7 +393,11 @@ class GCEEngine:
                 :return: None
                 """
                 if self["targetSize"] > 0 and not force_stop:
-                    raise Exception("Instance group {name} has {num} workers running")
+                    raise Exception(
+                        "Instance group {name} has {num} workers running".format(
+                            name=self["name"], num=self["targetSize"]
+                        )
+                    )
                 delete_instance_group_manager(self["name"])
 
             @property
@@ -421,7 +425,7 @@ class GCEEngine:
                     result.append(InstanceGroupWorker(group))
         return result
 
-    def stop(self, force_stop=False):
+    def stop(self, force_stop=True):
         """
         Delete all workers provisioned by this engine. Block until deleted.
 
@@ -429,7 +433,7 @@ class GCEEngine:
         :return: None
         """
         for worker in self.workers():
-            worker.cleanup(force_stop=force_stop)
+            worker.stop(force_stop=force_stop)
 
     def cleanup(self, force_stop=True):
         """
@@ -439,7 +443,7 @@ class GCEEngine:
         :return: None
         """
         for worker in self.workers():
-            worker.cleanup(force_stop=force_stop)
+            worker.stop(force_stop=force_stop)
 
         try:
             self._subscriber.delete_subscription(self._subscription_path)
