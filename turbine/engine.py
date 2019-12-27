@@ -489,11 +489,21 @@ def delete_if_exists(rest_type, wait: bool = True, **param):
 
 class GCEOperation:
     def __init__(self, config, compute, op):
+        """
+        Create a new updatable wrapper around a GCE operation call
+        :param config: GCE configuration information
+        :param compute: The GCE compute API to use
+        :param op: The current state of a GCE operation
+        """
         self._config = config
         self._compute = compute
         self._base = op
 
     def refresh(self):
+        """
+        Consult the server to update progress on this operation.
+        :return: self, updated
+        """
         self._base = (
             self._compute.zoneOperations()
             .get(
@@ -507,7 +517,23 @@ class GCEOperation:
 
     @property
     def base(self):
+        """
+        :return: The underlying GCE operation dict
+        """
         return self._base
 
-    def wait(self):
-        pass
+    def wait(self, query_delay=1):
+        """
+        Wait until an operation is marked as done.
+
+        :param query_delay: Time to wait in between status checks
+        :return: None
+        """
+        while True:
+            self.refresh()
+
+            if self._base["status"] == "DONE":
+                if "error" in self._base:
+                    raise Exception(self._base["error"])
+                return
+            time.sleep(query_delay)
