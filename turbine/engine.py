@@ -69,7 +69,9 @@ class GCEEngine:
             "compute", "v1", credentials=self._config.credentials
         )
 
-    def prepare_queue(self):
+        self._prepare_queue()
+
+    def _prepare_queue(self):
         """
         Prepare the queue to add tasks to this engine.
 
@@ -128,7 +130,16 @@ class GCEEngine:
         for local, remote in outputs:
             attributes["UPLOAD " + local] = remote
 
-        self._publisher.publish(self._topic_path, bytes(script, "UTF-8"), **attributes)
+        try:
+            self._publisher.publish(
+                self._topic_path, bytes(script, "UTF-8"), **attributes
+            )
+        except google.api_core.exceptions.NotFound:
+            # Create the topic and retry
+            self._prepare_queue()
+            self._publisher.publish(
+                self._topic_path, bytes(script, "UTF-8"), **attributes
+            )
 
     def _prepare_template(
         self,
