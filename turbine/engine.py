@@ -315,7 +315,7 @@ class GCEEngine:
         template_id = self._id + "-" + worker_id
         self._prepare_template(
             template_id, machine_type, preemptible, accelerators, delete_when_done
-        ).wait()
+        )
 
         GCEOperation(
             self._compute,
