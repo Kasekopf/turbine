@@ -275,7 +275,7 @@ class GCEEngine:
             ]
 
         # Create the template
-        return GCEOperation(
+        GCEOperation(
             self._compute,
             self._compute.instanceTemplates()
             .insert(project=self._config.project_id, body=template)
@@ -310,16 +310,14 @@ class GCEEngine:
             )  # Otherwise I have to figure out REST pagination
 
         if worker_id is None:
-            worker_id = "".join(
-                random.choice(string.ascii_lowercase) for _ in range(10)
-            )
+            worker_id = "".join(random.choice(string.ascii_lowercase) for _ in range(4))
 
         template_id = self._id + "-" + worker_id
         self._prepare_template(
             template_id, machine_type, preemptible, accelerators, delete_when_done
         ).wait()
 
-        return GCEOperation(
+        GCEOperation(
             self._compute,
             self._compute.instanceGroupManagers()
             .insert(
@@ -336,6 +334,7 @@ class GCEEngine:
             )
             .execute(),
         ).wait()
+        print("Started managed instance group " + template_id)
 
     def workers(self):
         """
