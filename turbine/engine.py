@@ -82,11 +82,7 @@ class GCEEngine:
             self._publisher.create_topic(self._topic_path)
             print("Created topic " + self._topic_path)
         except google.api_core.exceptions.AlreadyExists:
-            raise RuntimeError(
-                "Topic {path} already exists. Perhaps it has already been prepared?".format(
-                    path=self._topic_path
-                )
-            ) from None
+            pass
 
         try:
             self._subscriber.create_subscription(
@@ -94,11 +90,7 @@ class GCEEngine:
             )
             print("Created subscription " + self._subscription_path)
         except google.api_core.exceptions.AlreadyExists:
-            raise RuntimeError(
-                "Subscription {path} already exists. Perhaps it has already been prepared?".format(
-                    path=self._subscription_path
-                )
-            ) from None
+            pass
 
     def add_task(
         self,
