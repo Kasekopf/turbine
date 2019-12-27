@@ -3,6 +3,8 @@ import google.auth.credentials
 import google.cloud.pubsub
 import googleapiclient.discovery
 import googleapiclient.errors
+import random
+import string
 import time
 import typing
 
@@ -67,10 +69,6 @@ class GCEEngine:
             "compute", "v1", credentials=self._config.credentials
         )
 
-        self._instance_template = "projects/{project_id}/global/instanceTemplates/{id}".format(
-            project_id=self._config.project_id, id=self._id
-        )
-
     def prepare_queue(self):
         """
         Prepare the queue to add tasks to this engine.
@@ -99,25 +97,70 @@ class GCEEngine:
                 )
             ) from None
 
-    def _vm_specification(
+    def add_task(
         self,
+        script: str,
+        inputs: typing.List[typing.Tuple[str, str]] = None,
+        outputs: typing.List[typing.Tuple[str, str]] = None,
+    ):
+        """
+        Assign an additional task to this engine. A task consists of a script, together with some specified inputs.
+
+        The script will ultimately be run on the provided image with a working directory containing only the script.
+        [inputs] is a list of files to copy into the working directory from GCS before running the script.
+        [outputs] is a list of files or directories to copy from the working directory to GCS after running the script.
+
+        Note that this method can only be run after .prepare_queue() has been called.
+
+        :param script: The script to run as part of this task.
+        :param inputs: Files to copy from GCS, as a list of ([local path], [GCS blob id]) pairs.
+        :param outputs: Files or directories to copy to GCS, as a list of ([local path], [GCS blob id]) pairs.
+        :return:
+        """
+        if inputs is None:
+            inputs = []
+        if outputs is None:
+            outputs = []
+
+        attributes = {}
+        for local, remote in inputs:
+            attributes["SOURCE " + local] = remote
+        for local, remote in outputs:
+            attributes["UPLOAD " + local] = remote
+
+        self._publisher.publish(self._topic_path, bytes(script, "UTF-8"), **attributes)
+
+    def _prepare_template(
+        self,
+        template_id: str,
         machine_type: str,
         preemptible: bool,
         accelerators: typing.List[typing.Tuple[str, int]],
         delete_when_done: bool,
     ):
         """
-        Construct a VM specification for a VM that can process tasks given to this engine.
+        Construct an instance template for a VM that can process tasks given to this engine.
+        Delete the previous instance template by this name if any exists.
 
         There is no public API for constructing a container spec (without going through GKE
         or the online console), so this may be fragile.
 
+        :param template_id: The id to use for the created template.
         :param machine_type: The machine type to use for the specification.
         :param preemptible: True if the VM should be preemptible, otherwise false.
         :param accelerators: A list of (name, count) for each accelerator to be included.
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
-        :return: A dictionary representing a VM specification.
+        :return: The GCE operation currently creating the template.
         """
+
+        # Delete this template if it already exists
+        delete_if_exists(
+            self._compute.instanceTemplates(),
+            wait=True,
+            project=self._config.project_id,
+            instanceTemplate=template_id,
+        )
+
         # Environment variables to include when running the docker image
         environment_vars = {"GCE_SUBSCRIPTION": self._subscription_path}
         if not delete_when_done:
@@ -154,7 +197,7 @@ class GCEEngine:
         parent_vm_image = "cos-stable-78-12499-89-0"
 
         template = {
-            "name": self._id,
+            "name": template_id,
             "description": "",
             "properties": {
                 "machineType": machine_type,
@@ -222,46 +265,14 @@ class GCEEngine:
             },
         }
 
+        # Add any hardware accelerators
         if accelerators is not None:
             template["properties"]["guestAccelerators"] = [
                 {"acceleratorType": accelerator[0], "acceleratorCount": accelerator[1]}
                 for accelerator in accelerators
             ]
-        return template
 
-    def _prepare_template(
-        self,
-        machine_type: str = "n1-standard-1",
-        preemptible: bool = True,
-        accelerators: typing.List[typing.Tuple[str, int]] = None,
-        delete_when_done: bool = True,
-    ):
-        """
-        Run initial, cheap preparations for an instance group of VMs that can process tasks given to this engine.
-
-        In particular, set up an instance template for such VMs. Delete the previous instance template if any exists.
-
-        :param template_suffix:
-        :param machine_type: The machine type to use for the specification.
-        :param preemptible: True if the VM should be preemptible, otherwise false.
-        :param accelerators: A list of (name, count) for each accelerator to be included.
-        :param delete_when_done: True if the VM should delete itself when there are no tasks left.
-        :return: None
-        """
-
-        delete_if_exists(
-            self._compute.instanceTemplates(),
-            project=self._config.project_id,
-            instanceTemplate=self._id,
-        )
-
-        template = self._vm_specification(
-            machine_type=machine_type,
-            preemptible=preemptible,
-            accelerators=accelerators,
-            delete_when_done=delete_when_done,
-        )
-
+        # Create the template
         return GCEOperation(
             self._config,
             self._compute,
@@ -270,64 +281,42 @@ class GCEEngine:
             .execute(),
         )
 
-    def add_task(
+    def start_workers(
         self,
-        script: str,
-        inputs: typing.List[typing.Tuple[str, str]] = None,
-        outputs: typing.List[typing.Tuple[str, str]] = None,
+        target_size: int,
+        worker_id: str = None,
+        machine_type: str = "n1-standard-1",
+        preemptible: bool = True,
+        accelerators: typing.List[typing.Tuple[str, int]] = None,
+        delete_when_done: bool = True,
     ):
         """
-        Assign an additional task to this engine. A task consists of a script, together with some specified inputs.
-
-        The script will ultimately be run on the provided image with a working directory containing only the script.
-        [inputs] is a list of files to copy into the working directory from GCS before running the script.
-        [outputs] is a list of files or directories to copy from the working directory to GCS after running the script.
-
-        Note that this method can only be run after .prepare_queue() has been called.
-
-        :param script: The script to run as part of this task.
-        :param inputs: Files to copy from GCS, as a list of ([local path], [GCS blob id]) pairs.
-        :param outputs: Files or directories to copy to GCS, as a list of ([local path], [GCS blob id]) pairs.
-        :return:
-        """
-        if inputs is None:
-            inputs = []
-        if outputs is None:
-            outputs = []
-
-        attributes = {}
-        for local, remote in inputs:
-            attributes["SOURCE " + local] = remote
-        for local, remote in outputs:
-            attributes["UPLOAD " + local] = remote
-
-        self._publisher.publish(self._topic_path, bytes(script, "UTF-8"), **attributes)
-
-    def start_workers(self, target_size: int, worker_id: str = ""):
-        """
         Start an instance group to process tasks given to this engine. All VMs in the instance group will automatically
-        delete themselves when the engine has no tasks left.
-
-        If {gcloud} is true, returns a command to run in gcloud.
-        If {gcloud} is false, returns the result of the REST API call to start the instance group.
-
-        I would prefer to only offer the REST API, but the API call currently doesn't work.
+        delete themselves when the engine has no tasks left, unless delete_from_done is set.
 
         :param target_size: The number of VMs (<=500) to target in the instance group.
-        :param worker_id: An additional, optional identifier for this worker. This can be used if a previous worker
-                          is already running, or in the process of being deleted.
-        :param gcloud: True if a gcloud call should be used instead of the REST API.
-        :return: Either a gcloud call to run, or the result of the REST API call.
+        :param worker_id: An additional, optional identifier for this worker. Will be randomized if not set.
+        :param machine_type: The machine type to use for the specification.
+        :param preemptible: True if the VM should be preemptible, otherwise false.
+        :param accelerators: A list of (name, count) for each accelerator to be included.
+        :param delete_when_done: True if the VM should delete itself when no tasks exist.
+        :return: The GCE operation currently creating workers.
         """
-        if worker_id == "":
-            name = self._id
-        else:
-            name = self._id + "-" + worker_id
 
         if target_size > 500:
             raise RuntimeError(
                 "Maximum allowed target size of 500"
             )  # Otherwise I have to figure out REST pagination
+
+        if worker_id is None:
+            worker_id = "".join(
+                random.choice(string.ascii_lowercase) for _ in range(10)
+            )
+
+        template_id = self._id + "-" + worker_id
+        self._prepare_template(
+            template_id, machine_type, preemptible, accelerators, delete_when_done
+        ).wait()
 
         return GCEOperation(
             self._config,
@@ -337,9 +326,11 @@ class GCEEngine:
                 project=self._config.project_id,
                 zone=self._config.zone,
                 body={
-                    "name": name,
-                    "instanceTemplate": self._instance_template,
-                    "baseInstanceName": name,
+                    "name": template_id,
+                    "instanceTemplate": "projects/{project_id}/global/instanceTemplates/{id}".format(
+                        project_id=self._config.project_id, id=template_id
+                    ),
+                    "baseInstanceName": template_id,
                     "targetSize": target_size,
                 },
             )
@@ -352,20 +343,28 @@ class GCEEngine:
         :return:
         """
 
-        def delete_instance_group_manager(name, wait=True):
+        def delete_instance_group_manager(name):
             """
-            Delete the provided instance group manager in this project
+            Delete the provided instance group manager in this project. Block until deleted.
+
             :param name: The name of the instance group manager to delete.
-            :param wait: If true, wait for the instance group manager to be deleted.
             :return: None
             """
             print("Deleting instance group manager " + name)
             delete_if_exists(
                 self._compute.instanceGroupManagers(),
-                wait=wait,
+                wait=True,
                 project=self._config.project_id,
                 zone=self._config.zone,
                 instanceGroupManager=name,
+            )
+
+            print("Deleting instance template " + name)
+            delete_if_exists(
+                self._compute.instanceTemplates(),
+                wait=True,
+                project=self._config.project_id,
+                instanceTemplate=name,
             )
 
         class InstanceGroupWorker:
@@ -375,17 +374,16 @@ class GCEEngine:
             def __getitem__(self, name):
                 return self._base[name]
 
-            def delete(self, force_stop=False, wait=True):
+            def delete(self, force_stop=False):
                 """
-                Delete the instance group.
+                Delete the instance group and associated template. Block until deleted.
 
                 :param force_stop: If False, an exception will be raised if the group still has active workers.
-                :param wait: If true, wait for the instance group manager to be deleted.
                 :return: None
                 """
                 if self["targetSize"] > 0 and not force_stop:
                     raise Exception("Instance group {name} has {num} workers running")
-                delete_instance_group_manager(self["name"], wait=wait)
+                delete_instance_group_manager(self["name"])
 
             @property
             def info(self):
@@ -405,31 +403,32 @@ class GCEEngine:
         result = []
         if "items" in instance_groups:
             for group in instance_groups["items"]:
-                if group["instanceTemplate"].endswith(self._instance_template):
+                if (
+                    group["instanceTemplate"].find("instanceTemplates/" + self._id)
+                    != -1
+                ):
                     result.append(InstanceGroupWorker(group))
         return result
 
-    def cleanup_workers(self, force_stop=False, wait=True):
+    def cleanup_workers(self, force_stop=False):
         """
-        Delete all workers provisioned by this engine.
+        Delete all workers provisioned by this engine. Block until deleted.
 
         :param force_stop: If False, an exception will be raised if the group still has active workers.
-        :param wait: If true, wait for all workers to be deleted.
         :return: None
         """
         for worker in self.workers():
-            worker.delete(force_stop=force_stop, wait=wait)
+            worker.delete(force_stop=force_stop)
 
-    def cleanup(self, force_stop=True, wait=True):
+    def cleanup(self, force_stop=True):
         """
-        Delete all resources provisioned by this engine.
+        Delete all resources provisioned by this engine. Block until deleted.
 
         :param force_stop: If False, an exception will be raised if the group still has active workers.
-        :param wait: If true, wait for all workers to be deleted.
         :return: None
         """
         for worker in self.workers():
-            worker.delete(force_stop=force_stop, wait=wait)
+            worker.delete(force_stop=force_stop)
 
         try:
             self._subscriber.delete_subscription(self._subscription_path)
@@ -439,13 +438,6 @@ class GCEEngine:
         try:
             self._publisher.delete_topic(self._topic_path)
             print("Deleted topic " + self._topic_path)
-        except:
-            pass
-        try:
-            self._compute.instanceTemplates().delete(
-                project=self._config.project_id, instanceTemplate=self._id
-            ).execute()
-            print("Deleted instance template " + self._instance_template)
         except:
             pass
 
