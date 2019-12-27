@@ -532,9 +532,13 @@ class GCEOperation:
         :param query_delay: Time to wait in between status checks
         :return: None
         """
+        if self._base["status"] == "DONE":
+            if "error" in self._base:
+                raise Exception(self._base["error"])
+            return
+
         while True:
             self.refresh()
-
             if self._base["status"] == "DONE":
                 if "error" in self._base:
                     raise Exception(self._base["error"])
