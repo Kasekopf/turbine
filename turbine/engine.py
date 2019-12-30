@@ -141,6 +141,7 @@ class GCEEngine:
         preemptible: bool,
         accelerators: typing.List[typing.Tuple[str, int]],
         delete_when_done: bool,
+        external_ip: bool,
     ):
         """
         Construct an instance template for a VM that can process tasks given to this engine.
@@ -154,6 +155,7 @@ class GCEEngine:
         :param preemptible: True if the VM should be preemptible, otherwise false.
         :param accelerators: A list of (name, count) for each accelerator to be included.
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
+        :param external_ip: True if the VM should provision an external IP.
         :return: None
         """
 
@@ -239,14 +241,6 @@ class GCEEngine:
                         "network": "projects/{project_id}/global/networks/default".format(
                             project_id=self._config.project_id
                         ),
-                        "accessConfigs": [
-                            {
-                                "kind": "compute#accessConfig",
-                                "name": "External NAT",
-                                "type": "ONE_TO_ONE_NAT",
-                                "networkTier": "PREMIUM",
-                            }
-                        ],
                         "aliasIpRanges": [],
                     }
                 ],
@@ -274,6 +268,18 @@ class GCEEngine:
                 for accelerator in accelerators
             ]
 
+        # Add external IP
+        if external_ip:
+            # noinspection PyTypeChecker
+            template["properties"]["networkInterfaces"]["accessConfigs"] = [
+                {
+                    "kind": "compute#accessConfig",
+                    "name": "External NAT",
+                    "type": "ONE_TO_ONE_NAT",
+                    "networkTier": "PREMIUM",
+                }
+            ]
+
         # Create the template
         GCEOperation(
             self._compute,
@@ -290,6 +296,7 @@ class GCEEngine:
         preemptible: bool = True,
         accelerators: typing.List[typing.Tuple[str, int]] = None,
         delete_when_done: bool = True,
+        external_ip: bool = False,
     ):
         """
         Start an instance group to process tasks given to this engine. All VMs in the instance group will automatically
@@ -301,6 +308,7 @@ class GCEEngine:
         :param preemptible: True if the VM should be preemptible, otherwise false.
         :param accelerators: A list of (name, count) for each accelerator to be included.
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
+        :param external_ip: True if the VM should provision an external IP.
         :return: None
         """
 
@@ -314,7 +322,12 @@ class GCEEngine:
 
         template_id = self._id + "-" + worker_id
         self._prepare_template(
-            template_id, machine_type, preemptible, accelerators, delete_when_done
+            template_id,
+            machine_type,
+            preemptible,
+            accelerators,
+            delete_when_done,
+            external_ip,
         )
 
         GCEOperation(
