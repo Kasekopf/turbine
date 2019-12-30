@@ -134,6 +134,23 @@ class GCEEngine:
                 self._topic_path, bytes(script, "UTF-8"), **attributes
             )
 
+    def clear(self):
+        """
+        Clear all tasks for this engine by acknowledging all messages.
+
+        :return: None
+        """
+        while True:
+            try:
+                response = self._subscriber.pull(
+                    self._subscription_path, max_messages=1
+                )
+            except google.api_core.exceptions.DeadlineExceeded:
+                break
+
+            for msg in response.received_messages:
+                self._subscriber.acknowledge(self._subscription_path, [msg.ack_id])
+
     def _prepare_template(
         self,
         template_id: str,
