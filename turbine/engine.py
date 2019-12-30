@@ -313,7 +313,7 @@ class GCEEngine:
         preemptible: bool = True,
         accelerators: typing.List[typing.Tuple[str, int]] = None,
         delete_when_done: bool = True,
-        external_ip: bool = False,
+        external_ip: bool = True,
     ):
         """
         Start an instance group to process tasks given to this engine. All VMs in the instance group will automatically
