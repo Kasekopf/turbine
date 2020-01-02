@@ -104,7 +104,7 @@ def process_messages(subscription_path, delay_poll_if_empty, logger):
                 process(msg, storage_client, msg_logger)
             except Exception as e:
                 msg_logger.error(e)
-            subscriber.acknowledge(subscription_path, [msg.ack_id])
+            subscriber.acknowledge(subscription_path, [msg.ack_id], timeout=120.0)
             current_message = None
 
 
