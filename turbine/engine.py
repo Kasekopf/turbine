@@ -159,6 +159,7 @@ class GCEEngine:
         accelerators: typing.List[typing.Tuple[str, int]],
         delete_when_done: bool,
         external_ip: bool,
+        disk_size: int,
     ):
         """
         Construct an instance template for a VM that can process tasks given to this engine.
@@ -173,6 +174,7 @@ class GCEEngine:
         :param accelerators: A list of (name, count) for each accelerator to be included.
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
         :param external_ip: True if the VM should provision an external IP.
+        :param disk_size: Size of disk to attach to VM (GB).
         :return: None
         """
 
@@ -246,7 +248,7 @@ class GCEEngine:
                                 vm_image=parent_vm_image
                             ),
                             "diskType": "pd-standard",
-                            "diskSizeGb": "10",
+                            "diskSizeGb": str(disk_size),
                             "labels": {},
                         },
                     }
@@ -314,6 +316,7 @@ class GCEEngine:
         accelerators: typing.List[typing.Tuple[str, int]] = None,
         delete_when_done: bool = True,
         external_ip: bool = True,
+        disk_size: int = 10,
     ):
         """
         Start an instance group to process tasks given to this engine. All VMs in the instance group will automatically
@@ -326,6 +329,7 @@ class GCEEngine:
         :param accelerators: A list of (name, count) for each accelerator to be included.
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
         :param external_ip: True if the VM should provision an external IP.
+        :param disk_size: Size of disk to attach to VM (GB).
         :return: None
         """
 
@@ -339,12 +343,13 @@ class GCEEngine:
 
         template_id = self._id + "-" + worker_id
         self._prepare_template(
-            template_id,
-            machine_type,
-            preemptible,
-            accelerators,
-            delete_when_done,
-            external_ip,
+            template_id=template_id,
+            machine_type=machine_type,
+            preemptible=preemptible,
+            accelerators=accelerators,
+            delete_when_done=delete_when_done,
+            external_ip=external_ip,
+            disk_size=disk_size,
         )
 
         GCEOperation(
