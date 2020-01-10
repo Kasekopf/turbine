@@ -208,9 +208,8 @@ class GCEEngine:
                 "  containers:",
                 "    - name: {container_name}".format(container_name=self._id),
                 "      image: '{container_image}'".format(container_image=self._image),
-                "      command:",
-                "        - python",
                 "      args:",
+                "        - python",
                 "        - '-c'",
                 "        - import turbine; turbine.run()",
             ]
