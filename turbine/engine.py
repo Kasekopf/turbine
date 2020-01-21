@@ -322,7 +322,7 @@ class GCEEngine:
                 {
                     "key": "startup-script",
                     "value": self._docker_run_spec(
-                        environment_vars, accelerators is None
+                        environment_vars, accelerators is not None
                     ),
                 }
             )
