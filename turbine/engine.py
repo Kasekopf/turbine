@@ -151,6 +151,37 @@ class GCEEngine:
             for msg in response.received_messages:
                 self._subscriber.acknowledge(self._subscription_path, [msg.ack_id])
 
+    def _container_spec(self, environment_vars: typing.Dict[str, str]) -> str:
+        """
+        Construct a container spec for a GCE container-optimized image
+
+        :param environment_vars: Environmental variables to include in the image
+        :return:
+        """
+        # Prepare the container spec
+        # This container declaration format is not public API and may change without notice.
+        # ... so if something breaks, look here first.
+        environment_spec = ["      env:"]
+        for name, value in environment_vars.items():
+            environment_spec += [
+                "        - name: " + str(name),
+                "          value: " + str(value),
+            ]
+        return "\n".join(
+            [
+                "spec:",
+                "  containers:",
+                "    - name: {container_name}".format(container_name=self._id),
+                "      image: '{container_image}'".format(container_image=self._image),
+                "      args:",
+                "        - python",
+                "        - '-c'",
+                "        - import turbine; turbine.run()",
+            ]
+            + environment_spec
+            + ["      stdin: false", "      tty: false", "  restartPolicy: Never\n\n"]
+        )
+
     def _prepare_template(
         self,
         template_id: str,
@@ -160,6 +191,7 @@ class GCEEngine:
         delete_when_done: bool,
         external_ip: bool,
         disk_size: int,
+        disk_image: str = "projects/cos-cloud/global/images/cos-stable-78-12499-89-0",
     ):
         """
         Construct an instance template for a VM that can process tasks given to this engine.
@@ -175,6 +207,7 @@ class GCEEngine:
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
         :param external_ip: True if the VM should provision an external IP.
         :param disk_size: Size of disk to attach to VM (GB).
+        :param disk_image: Disk image to use (defaults to cos-stable)
         :return: None
         """
 
@@ -186,40 +219,6 @@ class GCEEngine:
             instanceTemplate=template_id,
         )
 
-        # Environment variables to include when running the docker image
-        environment_vars = {"GCE_SUBSCRIPTION": self._subscription_path}
-        if not delete_when_done:
-            environment_vars[
-                "RETRY_DELAY"
-            ] = 15  # instead of deleting the worker, recheck the queue every 15s.
-
-        # Prepare the container spec
-        # This container declaration format is not public API and may change without notice.
-        # ... so if something breaks, look here first.
-        environment_spec = ["      env:"]
-        for name, value in environment_vars.items():
-            environment_spec += [
-                "        - name: " + str(name),
-                "          value: " + str(value),
-            ]
-        container_spec = "\n".join(
-            [
-                "spec:",
-                "  containers:",
-                "    - name: {container_name}".format(container_name=self._id),
-                "      image: '{container_image}'".format(container_image=self._image),
-                "      args:",
-                "        - python",
-                "        - '-c'",
-                "        - import turbine; turbine.run()",
-            ]
-            + environment_spec
-            + ["      stdin: false", "      tty: false", "  restartPolicy: Never\n\n"]
-        )
-
-        # This value also probably needs to be updated occasionally
-        parent_vm_image = "cos-stable-78-12499-89-0"
-
         template = {
             "name": template_id,
             "description": "",
@@ -228,10 +227,7 @@ class GCEEngine:
                 "displayDevice": {"enableDisplay": False},
                 "metadata": {
                     "kind": "compute#metadata",
-                    "items": [
-                        {"key": "gce-container-declaration", "value": container_spec},
-                        {"key": "google-logging-enabled", "value": "true"},
-                    ],
+                    "items": [{"key": "google-logging-enabled", "value": "true"}],
                 },
                 "tags": {"items": []},
                 "disks": [
@@ -243,9 +239,7 @@ class GCEEngine:
                         "autoDelete": True,
                         "deviceName": self._id,
                         "initializeParams": {
-                            "sourceImage": "projects/cos-cloud/global/images/{vm_image}".format(
-                                vm_image=parent_vm_image
-                            ),
+                            "sourceImage": disk_image,
                             "diskType": "pd-standard",
                             "diskSizeGb": str(disk_size),
                             "labels": {},
@@ -262,7 +256,7 @@ class GCEEngine:
                         "aliasIpRanges": [],
                     }
                 ],
-                "labels": {"container-vm": parent_vm_image},
+                "labels": {},
                 "scheduling": {
                     "preemptible": preemptible,
                     "onHostMaintenance": "TERMINATE",
@@ -278,6 +272,23 @@ class GCEEngine:
                 ],
             },
         }
+
+        # Environment variables to include when running the docker image
+        environment_vars = {"GCE_SUBSCRIPTION": self._subscription_path}
+        if not delete_when_done:
+            environment_vars[
+                "RETRY_DELAY"
+            ] = 15  # instead of deleting the worker, recheck the queue every 15s.
+
+        # Add container information
+        template["properties"]["metadata"]["items"].append(
+            {
+                "key": "gce-container-declaration",
+                "value": self._container_spec(environment_vars),
+            }
+        )
+        # noinspection PyTypeChecker
+        template["properties"]["labels"]["container-vm"] = disk_image.rsplit("/", 1)[-1]
 
         # Add any hardware accelerators
         if accelerators is not None:
