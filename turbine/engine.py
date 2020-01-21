@@ -202,7 +202,7 @@ class GCEEngine:
         args.append("python")
         args.append("-c")
         args.append('"import turbine; turbine.run()"')
-        return "docker run " + " ".join(args)
+        return "gcloud auth configure-docker\ndocker run " + " ".join(args)
 
     def _prepare_template(
         self,
@@ -214,6 +214,7 @@ class GCEEngine:
         external_ip: bool,
         disk_size: int,
         disk_image: str,
+        custom_metadata: typing.Dict[str, str],
     ):
         """
         Construct an instance template for a VM that can process tasks given to this engine.
@@ -230,6 +231,7 @@ class GCEEngine:
         :param external_ip: True if the VM should provision an external IP.
         :param disk_size: Size of disk to attach to VM (GB).
         :param disk_image: Disk image to use.
+        :param custom_metadata: Additional metadata to include with the image.
         :return: None
         """
 
@@ -241,16 +243,15 @@ class GCEEngine:
             instanceTemplate=template_id,
         )
 
+        metadata = dict(custom_metadata) if custom_metadata is not None else {}
+        metadata["google-logging-enabled"] = "true"
         template = {
             "name": template_id,
             "description": "",
             "properties": {
                 "machineType": machine_type,
                 "displayDevice": {"enableDisplay": False},
-                "metadata": {
-                    "kind": "compute#metadata",
-                    "items": [{"key": "google-logging-enabled", "value": "true"}],
-                },
+                "metadata": {"kind": "compute#metadata"},
                 "tags": {"items": []},
                 "disks": [
                     {
@@ -305,11 +306,8 @@ class GCEEngine:
         # Add container information
         if disk_image.rsplit("/", 1)[-1].startswith("cos-stable"):
             # Use the container spec for a container-optimized OS
-            template["properties"]["metadata"]["items"].append(
-                {
-                    "key": "gce-container-declaration",
-                    "value": self._container_spec(environment_vars),
-                }
+            metadata["gce-container-declaration"] = self._container_spec(
+                environment_vars
             )
             # noinspection PyTypeChecker
             template["properties"]["labels"]["container-vm"] = disk_image.rsplit(
@@ -317,14 +315,15 @@ class GCEEngine:
             )[-1]
         else:
             # Otherwise, start the docker image ourselves in the startup-script
-            template["properties"]["metadata"]["items"].append(
-                {
-                    "key": "startup-script",
-                    "value": self._docker_run_spec(
-                        environment_vars, accelerators is not None
-                    ),
-                }
+            metadata["startup-script"] = self._docker_run_spec(
+                environment_vars, accelerators is not None
             )
+
+        # Include the metadata information
+        # noinspection PyTypeChecker
+        template["properties"]["metadata"]["items"] = [
+            {"key": key, "value": value} for key, value in metadata.items()
+        ]
 
         # Add any hardware accelerators
         if accelerators is not None:
@@ -364,6 +363,7 @@ class GCEEngine:
         external_ip: bool = True,
         disk_size: int = 10,
         disk_image: str = "projects/cos-cloud/global/images/cos-stable-78-12499-89-0",
+        metadata: typing.Dict[str, str] = None,
     ):
         """
         Start an instance group to process tasks given to this engine. All VMs in the instance group will automatically
@@ -378,6 +378,7 @@ class GCEEngine:
         :param external_ip: True if the VM should provision an external IP.
         :param disk_size: Size of disk to attach to VM (GB).
         :param disk_image: Disk image to use (defaults to cos-stable).
+        :param metadata: Additional metadata to include with the image.
         :return: None
         """
 
@@ -399,6 +400,7 @@ class GCEEngine:
             external_ip=external_ip,
             disk_size=disk_size,
             disk_image=disk_image,
+            custom_metadata=metadata,
         )
 
         GCEOperation(
