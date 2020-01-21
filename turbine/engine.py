@@ -193,17 +193,16 @@ class GCEEngine:
         """
         args = []
         for name, value in environment_vars.items():
-            args.append(("env", name + "=" + value))
+            args.append("--env " + name + "=" + value)
         if with_gpu:
-            args.append(("gpus", "all"))
-        args.append(("net", "host"))
-        args.append(("pid", "host"))
-        return (
-            "docker run "
-            + " ".join("--" + key + " " + value for key, value in args)
-            + " "
-            + self._image
-        )
+            args.append("--gpus all")
+        args.append("--net host")
+        args.append("--pid host")
+        args.append(self._image)
+        args.append("python")
+        args.append("-c")
+        args.append('"import turbine; turbine.run()"')
+        return "docker run " + " ".join(args)
 
     def _prepare_template(
         self,
