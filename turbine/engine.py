@@ -153,14 +153,13 @@ class GCEEngine:
 
     def _container_spec(self, environment_vars: typing.Dict[str, str]) -> str:
         """
-        Construct a container spec for a GCE container-optimized image
+        Construct a container spec for a GCE container-optimized image.
 
-        :param environment_vars: Environmental variables to include in the image
-        :return:
+        "This container declaration format is not public API and may change without notice."
+        ... so if something breaks, look here first.
+        :param environment_vars: Environmental variables to include in the image.
+        :return: A GCE container spec to start the image for this engine.
         """
-        # Prepare the container spec
-        # This container declaration format is not public API and may change without notice.
-        # ... so if something breaks, look here first.
         environment_spec = ["      env:"]
         for name, value in environment_vars.items():
             environment_spec += [
@@ -182,6 +181,30 @@ class GCEEngine:
             + ["      stdin: false", "      tty: false", "  restartPolicy: Never\n\n"]
         )
 
+    def _docker_run_spec(
+        self, environment_vars: typing.Dict[str, str], with_gpu: bool
+    ) -> str:
+        """
+        Construct a docker run command for this image.
+
+        :param environment_vars: Environmental variables to include in the image.
+        :param with_gpu: Give this image access to GPUs.
+        :return: A docker run command to start the image for this engine.
+        """
+        args = []
+        for name, value in environment_vars.items():
+            args.append(("env", name + "=" + value))
+        if with_gpu:
+            args.append(("gpus", "all"))
+        args.append(("net", "host"))
+        args.append(("pid", "host"))
+        return (
+            "docker run "
+            + " ".join("--" + key + " " + value for key, value in args)
+            + " "
+            + self._image
+        )
+
     def _prepare_template(
         self,
         template_id: str,
@@ -191,7 +214,7 @@ class GCEEngine:
         delete_when_done: bool,
         external_ip: bool,
         disk_size: int,
-        disk_image: str = "projects/cos-cloud/global/images/cos-stable-78-12499-89-0",
+        disk_image: str,
     ):
         """
         Construct an instance template for a VM that can process tasks given to this engine.
@@ -207,7 +230,7 @@ class GCEEngine:
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
         :param external_ip: True if the VM should provision an external IP.
         :param disk_size: Size of disk to attach to VM (GB).
-        :param disk_image: Disk image to use (defaults to cos-stable)
+        :param disk_image: Disk image to use.
         :return: None
         """
 
@@ -281,14 +304,28 @@ class GCEEngine:
             ] = 15  # instead of deleting the worker, recheck the queue every 15s.
 
         # Add container information
-        template["properties"]["metadata"]["items"].append(
-            {
-                "key": "gce-container-declaration",
-                "value": self._container_spec(environment_vars),
-            }
-        )
-        # noinspection PyTypeChecker
-        template["properties"]["labels"]["container-vm"] = disk_image.rsplit("/", 1)[-1]
+        if disk_image.rsplit("/", 1)[-1].startswith("cos-stable"):
+            # Use the container spec for a container-optimized OS
+            template["properties"]["metadata"]["items"].append(
+                {
+                    "key": "gce-container-declaration",
+                    "value": self._container_spec(environment_vars),
+                }
+            )
+            # noinspection PyTypeChecker
+            template["properties"]["labels"]["container-vm"] = disk_image.rsplit(
+                "/", 1
+            )[-1]
+        else:
+            # Otherwise, start the docker image ourselves in the startup-script
+            template["properties"]["metadata"]["items"].append(
+                {
+                    "key": "startup-script",
+                    "value": self._docker_run_spec(
+                        environment_vars, accelerators is None
+                    ),
+                }
+            )
 
         # Add any hardware accelerators
         if accelerators is not None:
@@ -327,6 +364,7 @@ class GCEEngine:
         delete_when_done: bool = True,
         external_ip: bool = True,
         disk_size: int = 10,
+        disk_image: str = "projects/cos-cloud/global/images/cos-stable-78-12499-89-0",
     ):
         """
         Start an instance group to process tasks given to this engine. All VMs in the instance group will automatically
@@ -340,6 +378,7 @@ class GCEEngine:
         :param delete_when_done: True if the VM should delete itself when no tasks exist.
         :param external_ip: True if the VM should provision an external IP.
         :param disk_size: Size of disk to attach to VM (GB).
+        :param disk_image: Disk image to use (defaults to cos-stable).
         :return: None
         """
 
@@ -360,6 +399,7 @@ class GCEEngine:
             delete_when_done=delete_when_done,
             external_ip=external_ip,
             disk_size=disk_size,
+            disk_image=disk_image,
         )
 
         GCEOperation(
