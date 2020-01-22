@@ -155,8 +155,11 @@ class GCEEngine:
         """
         Construct a container spec for a GCE container-optimized image.
 
-        "This container declaration format is not public API and may change without notice."
-        ... so if something breaks, look here first.
+        There is no public API for constructing a container spec (without going through GKE
+        or the online console), so this may be fragile.
+            "This container declaration format is not public API and may change without notice."
+        If something breaks, look here first.
+
         :param environment_vars: Environmental variables to include in the image.
         :return: A GCE container spec to start the image for this engine.
         """
@@ -219,9 +222,6 @@ class GCEEngine:
         """
         Construct an instance template for a VM that can process tasks given to this engine.
         Delete the previous instance template by this name if any exists.
-
-        There is no public API for constructing a container spec (without going through GKE
-        or the online console), so this may be fragile.
 
         :param template_id: The id to use for the created template.
         :param machine_type: The machine type to use for the specification.
@@ -299,9 +299,8 @@ class GCEEngine:
         # Environment variables to include when running the docker image
         environment_vars = {"GCE_SUBSCRIPTION": self._subscription_path}
         if not delete_when_done:
-            environment_vars[
-                "RETRY_DELAY"
-            ] = 15  # instead of deleting the worker, recheck the queue every 15s.
+            # instead of deleting the worker, recheck the queue every 15s.
+            environment_vars["RETRY_DELAY"] = 15
 
         # Add container information
         if disk_image.rsplit("/", 1)[-1].startswith("cos-stable"):
