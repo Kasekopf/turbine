@@ -1,6 +1,6 @@
 import google.api_core.exceptions
 import google.auth.credentials
-import google.cloud.pubsub
+import google.cloud.pubsub_v1
 import googleapiclient.discovery
 import googleapiclient.errors
 import random
@@ -54,12 +54,12 @@ class GCEEngine:
         self._image = image
         self._config = config
 
-        self._publisher = google.cloud.pubsub.PublisherClient(
+        self._publisher = google.cloud.pubsub_v1.PublisherClient(
             **{"credentials": self._config.credentials}
         )
         self._topic_path = self._publisher.topic_path(self._config.project_id, self._id)
 
-        self._subscriber = google.cloud.pubsub.SubscriberClient(
+        self._subscriber = google.cloud.pubsub_v1.SubscriberClient(
             **{"credentials": self._config.credentials}
         )
         self._subscription_path = self._subscriber.subscription_path(
@@ -79,14 +79,14 @@ class GCEEngine:
         :return: None
         """
         try:
-            self._publisher.create_topic(self._topic_path)
+            self._publisher.create_topic(request={"name": self._topic_path})
             print("Created topic " + self._topic_path)
         except google.api_core.exceptions.AlreadyExists:
             pass
 
         try:
             self._subscriber.create_subscription(
-                self._subscription_path, self._topic_path, ack_deadline_seconds=60
+                request={"name": self._subscription_path, "topic": self._topic_path, "ack_deadline_seconds": 60}
             )
             print("Created subscription " + self._subscription_path)
         except google.api_core.exceptions.AlreadyExists:
@@ -334,7 +334,7 @@ class GCEEngine:
         # Add external IP
         if external_ip:
             # noinspection PyTypeChecker
-            template["properties"]["networkInterfaces"]["accessConfigs"] = [
+            template["properties"]["networkInterfaces"][0]["accessConfigs"] = [
                 {
                     "kind": "compute#accessConfig",
                     "name": "External NAT",
