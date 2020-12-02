@@ -1,6 +1,6 @@
 import google.api_core.exceptions
 import google.cloud.logging
-import google.cloud.pubsub
+import google.cloud.pubsub_v1
 import google.cloud.storage
 import json
 import logging
@@ -56,7 +56,7 @@ def process_messages(subscription_path, delay_poll_if_empty, logger):
     :return: None
     """
 
-    subscriber = google.cloud.pubsub.SubscriberClient()
+    subscriber = google.cloud.pubsub_v1.SubscriberClient()
     storage_client = google.cloud.storage.Client()
     current_message = None
     running = True
@@ -70,7 +70,11 @@ def process_messages(subscription_path, delay_poll_if_empty, logger):
             local_msg = current_message
             if local_msg is not None:
                 subscriber.modify_ack_deadline(
-                    subscription_path, [local_msg.ack_id], ack_deadline_seconds=60
+                    request={
+                        "subscription": subscription_path,
+                        "ack_ids": [local_msg.ack_id],
+                        "ack_deadline_seconds": 60,
+                    }
                 )
             time.sleep(30)
 
@@ -80,7 +84,9 @@ def process_messages(subscription_path, delay_poll_if_empty, logger):
     logger.info("Looking for tasks in queue")
     while True:
         try:
-            response = subscriber.pull(subscription_path, max_messages=1)
+            response = subscriber.pull(
+                request={"subscription": subscription_path, "max_messages": 1}
+            )
         except google.api_core.exceptions.DeadlineExceeded:
             if delay_poll_if_empty > 0:
                 logger.info(
@@ -104,7 +110,13 @@ def process_messages(subscription_path, delay_poll_if_empty, logger):
                 process(msg, storage_client, msg_logger)
             except Exception as e:
                 msg_logger.error(e)
-            subscriber.acknowledge(subscription_path, [msg.ack_id], timeout=120.0)
+            subscriber.acknowledge(
+                request={
+                    "subscription": subscription_path,
+                    "ack_ids": [msg.ack_id],
+                    "timeout": 120.0,
+                }
+            )
             current_message = None
 
 

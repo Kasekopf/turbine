@@ -86,7 +86,11 @@ class GCEEngine:
 
         try:
             self._subscriber.create_subscription(
-                request={"name": self._subscription_path, "topic": self._topic_path, "ack_deadline_seconds": 60}
+                request={
+                    "name": self._subscription_path,
+                    "topic": self._topic_path,
+                    "ack_deadline_seconds": 60,
+                }
             )
             print("Created subscription " + self._subscription_path)
         except google.api_core.exceptions.AlreadyExists:
