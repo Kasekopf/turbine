@@ -111,11 +111,7 @@ def process_messages(subscription_path, delay_poll_if_empty, logger):
             except Exception as e:
                 msg_logger.error(e)
             subscriber.acknowledge(
-                request={
-                    "subscription": subscription_path,
-                    "ack_ids": [msg.ack_id],
-                    "timeout": 120.0,
-                }
+                request={"subscription": subscription_path, "ack_ids": [msg.ack_id]}
             )
             current_message = None
 

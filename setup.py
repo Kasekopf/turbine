@@ -10,7 +10,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="turbine",
-    version="1.3.2",
+    version="1.3.3",
     author="Jeffrey Dudek",
     author_email="jeffreydudek@gmail.com",
     description="A Python 3 tool to harness the google cloud to run shell scripts",
