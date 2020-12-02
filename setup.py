@@ -10,7 +10,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="turbine",
-    version="1.3.3",
+    version="1.3.4",
     author="Jeffrey Dudek",
     author_email="jeffreydudek@gmail.com",
     description="A Python 3 tool to harness the google cloud to run shell scripts",
@@ -25,6 +25,7 @@ setuptools.setup(
         "google-cloud-storage",
         "google-cloud-logging",
         "google-api-python-client",
+        "grpcio>=1.29.0",
     ],
     python_requires=">=3.6",
     classifiers=[
